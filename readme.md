@@ -6,29 +6,22 @@ obstacle from about 0.5m to 3m in front of it.
 The hardware for `free_ranger` is simple enough to build on a breadboard
 with easily-available components, and should cost less than $10.
 The circuit as drawn is powered by 2 lithium cells in
-series, about 7.8V.
+series, about 7.4V.
 
 # How to use it.
-Build the circuit.
+Build the circuit.  Hook it up to an arduino.
 
-Then see the sample code.  Basically, call `range()`, which will
-return a number representing the time of flight of the acoustic
-reflection from the object in units of (approx.) hundreds of
-microseconds.  `free_ranger` cannot detect objects less than about
-0.5m/18" in front of it.  For that, `range()` will return 6 (minimum
-distance) or -1 (no reflection).
-
-The call will take about 4ms to complete, and it should be run
-with interrupts off, i.e. call `cli()` before and `sei()` after.
-
-To convert to approximate range, multiply the returned value by
-7.7cm.  For greater accuracy, you have to measure and calibrate.
-However, given the large range resolution (7.7cm), this is of
-limited value.
+Bring up the `range_demo` code in the Arduino IDE.  Compile and
+program.  The code returns the range to the target in
+centimetres, or some
+large number if out of range.  `free_ranger` cannot detect
+targets too close by, the reflection from any object close than
+about 0.8m is swamped by the transmission noise.  The reported
+range does not go lower than this value for this reason.
 
 # How it works.
 The hardware consists of a transmitter and a separate receiver.
-Each has their own transducer.
+Each has their own identical transducer.
 
 ## Transmission
 40kHz piezoelectric parking sensors are used for the transmit
@@ -54,6 +47,13 @@ This is actually quite a low driving voltage.  These transducers take
 probably a couple of hundred volts when used as
 parking sensors, but 40V is enough for this purpose.
 
+You can see in [this diagram](trace-no-transducers.bmp) the
+ringing in the transmitted waveform (yellow trace).  Similarly,
+the received waveform (blue) shows electrical interference from
+the transmitter.  [This trace](trace-in-air.bmp) is with the
+transducers connected in air, so there is some acoustic
+interference as well.
+
 ## Reception
 A second identical transducer is used for reception.  This is
 normally situated next to the transmit transducer, pointing in
@@ -67,20 +67,17 @@ resistors R6 and D1 bias the signal at about 1.6V.
 `free_ranger` can be run without a filter if you want to simplify it,
 but the filter is cheap insurance against noise and spurs.
 
-The received signal consists first of transmitter noise, then
-transmitter ringing, then a pause, and finally the reflection.
+The received signal consists first of direct noise from the
+transmitter, then transmitter ringing, then a pause, and finally
+the reflection, as can be seen [here](trace-tank-length.bmp).
+Ringing stops after about 600us, after which there is nothing until
+around 3.5ms where the comparator is repeatedly triggered (yellow
+and blue traces cross).
 
 For simplicity, the receiver is always on, so it hears the noise
-and ringing but the code ignores them.  Most of the transmitter
+and ringing but the code ignores them.  Some of the transmitter
 noise comes through the rails and is ultimately due to transmitter
 current spikes.
-
-Even after the code has shut down the transmit transducer, it will
-ring (mechanically oscillate) for about 600us.  This ringing is
-picked up by the receiver as a direct signal and can interfere with
-the reflection.  This is the reason objects less than 600us distant
-(about 18 inches) cannot be discerned: the reflection is
-swallowed up by the ringing.
 
 After filtering, the signal then goes through the gain stage.
 The total gain of both stages is about 100.
@@ -100,8 +97,8 @@ The Arduino interface does not natively provide an API to the
 comparator, so the code manipulates the comparator registers
 directly.
 
-The code counts (in `buckets[]`) the number of
-comparator "highs" in each 100us (approx.) interval.  Then it
+The code counts (in `cells[]`) the number of
+comparator "highs" in each 160us interval.  Then it
 looks for the first run of 8 highs after the ringing phase,
 and considers that to be the start of the reflection.  The time
 that this occurred is returned as the range value.
@@ -110,9 +107,10 @@ Even though the code sends only 2 pulses, ringing will put many more
 in flight, and reflections and interference may add to the return
 pulse train length.  This is why the code looks for 8 reflected pulses.
 
-The two operations of recording the triggers and searching for runs
-are done separately in the code, because recording is done in a
-timed loop.
+[This image](trace-pipe-length.bmp) shows the return from a
+1-1/2" air-filled PVC pipe placed 0.8m in front of the
+transducers.  The reflection around 1ms is due to the pipe, and
+the reflection at 3.5ms is due to the far end of the test tank.
 
 # Caveats
 You should feel free to fiddle with the code, but be very
@@ -138,6 +136,7 @@ three milliamps.  With an Arduino, it should be around 25mA.
 - `vhalf` should be around 1.7V for a red LED.
 - J4:1 should be around 2.5V with no signal.
 - J4:2 should be 0.1V less than J4:1 with no signal.
+- DC offset between `comp-` and `comp+` should be around 75mV
 
 ## With a scope.
 Set to trigger at T6 on a rising edge.
@@ -151,3 +150,11 @@ With the two transducers facing each other on the bench 6 inches
 apart, you should be able to see the signal appearing at J1:2
 after 0.5ms, and there should be a dozen or so cycles of about
 0.5Vp-p amplitude.
+
+See also the included scope traces.
+
+# Thanks
+If you build one, I would be happy to hear
+from you: htarold@gmail.com
+
+Thanks.
