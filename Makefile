@@ -10,13 +10,13 @@ stem=free_ranger
 %.showtime:%.sch.pdf %.gerbers.zip readme.md
 	:
 %.sch.pdf:%.sch
-	echo $?; exit 1
+	echo Make $@ from $< manually; exit 1
 %.gerbers.zip:%.bottom.gbr %.bottommask.gbr %.bottompaste.gbr \
 %.bottomsilk.gbr %.fab.gbr %.outline.gbr %.plated-drill.cnc %.top.gbr \
 %.topmask.gbr %.toppaste.gbr %.topsilk.gbr %.bom
 	zip $@ $^ && rm -f $^
 readme.md:$(stem).sch $(stem).pcb
-	echo $? ; exit 1
+	echo $^ changed, update $@ ; exit 1
 
 %.list: %.c
 	$(CC) -c $(CFLAGS) -E $< |less
