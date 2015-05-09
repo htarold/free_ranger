@@ -204,7 +204,7 @@ footprint=0805
 T 48200 47200 5 10 1 1 0 0 1
 refdes=R5
 T 48200 46900 5 10 1 1 0 0 1
-value=10k
+value=4k7
 }
 C 48800 45700 1 90 0 capacitor-h-1.sym
 {
