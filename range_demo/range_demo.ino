@@ -1,5 +1,5 @@
 /*
-  free_ranger demo code.
+  free_ranger demo code.  Code compiled and ran for nano V3.
   
   Code below outputs to a 8x2 text LCD as well as through the serial monitor.
   The code will still function if you don't connect an LCD.
@@ -66,7 +66,7 @@ int16_t range(uint8_t arduino_pin)
   ACSR = _BV(ACI)                     /* clear ACI */
        | _BV(ACIS0) | _BV(ACIS1);     /* Triggers on rising edge */
        
-#define ON_TIME 12
+#define ON_TIME 6
 #define OFF_TIME (24-ON_TIME)
   OUTPUT_HIGH; _delay_us(ON_TIME);
   OUTPUT_LOW;  _delay_us(OFF_TIME);
@@ -103,7 +103,7 @@ int16_t range(uint8_t arduino_pin)
   Coarse resolution (get the cell number):
   Look for first run of THRESHOLD or more bits, past the 600us mark (bypass the ringing).
    */
-#define THRESHOLD 7
+#define THRESHOLD 8
   for(c = 5; c < sizeof(cells)-1; c++){
     uint8_t bits;
     bits = cells[c] + cells[c+1];
