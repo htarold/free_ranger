@@ -72,6 +72,11 @@ int16_t range(uint8_t arduino_pin)
   OUTPUT_LOW;  _delay_us(OFF_TIME);
   OUTPUT_HIGH; _delay_us(ON_TIME);
   OUTPUT_LOW;  _delay_us(OFF_TIME);
+  /* Put the brakes on */
+  _delay_us(19);
+  OUTPUT_HIGH; _delay_us(ON_TIME);
+  OUTPUT_LOW;
+
   *ddr &= ~bm;
   ACSR |= _BV(ACI);
 
@@ -105,7 +110,7 @@ int16_t range(uint8_t arduino_pin)
    */
 #define THRESHOLD 8
 
-  for(c = 5; c < sizeof(cells)-1; c++){
+  for(c = 6; c < sizeof(cells)-1; c++){
     uint8_t bits;
     bits = cells[c] + cells[c+1];
     if( bits >= THRESHOLD )break;
