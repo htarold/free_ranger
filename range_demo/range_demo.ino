@@ -19,14 +19,14 @@
 
 #include <LiquidCrystal.h>
 
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+//LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
 void setup(void)
 {
   pinMode(9, OUTPUT);
   analogWrite(9, 50);  /* Contrast control.  Lower voltage = higher contrast */
-  lcd.begin(8, 2);
-  lcd.print("range:");
+  //lcd.begin(8, 2);
+  //lcd.print("range:");
   Serial.begin(9600);
   Serial.print("Starting\r\n");
   delay(100);
@@ -35,12 +35,29 @@ void setup(void)
 #include <Arduino.h>
 #include <util/delay.h>
 
+void start_dither(void)
+{
+  DDRB |= _BV(DDB3);
+  OCR2A = (2*256/5);                       /* about 2 volts */
+  TCCR2A = _BV(WGM21) | _BV(WGM20)         /* Fast PWM mode 3 */
+         | _BV(COM2A1);                    /* output on Arduino 11 = PB3 = OC2A */
+  TCCR2B = _BV(CS20);                      /* /1 => 62.5kHz */
+}
+void stop_dither(void)
+{ 
+  TCCR2B = 0;
+  PORTB &= ~_BV(PORTB3);
+  DDRB &= ~_BV(DDB3);
+}
+
 int16_t range(uint8_t arduino_pin)
 {
   uint8_t port, bm, sreg;
   volatile uint8_t * ddr, * out;
 #define NR_CELLS 40
   uint8_t cells[NR_CELLS], tcnt, c;
+  
+  start_dither(); /* give it some time to ramp up */
 
   /*
   Pos input to comparator MUST be AIN0 = OC0A/PD6/nano6
@@ -95,6 +112,7 @@ int16_t range(uint8_t arduino_pin)
         ACSR |= _BV(ACI);
       }
   }
+  stop_dither();
   
   SREG = sreg;
   
@@ -130,10 +148,10 @@ void loop() {
   // set the cursor to column 0, line 1
   // (note: line 1 is the second row, since counting begins with 0):
   distance = range(8);
-  lcd.setCursor(0, 1);
-  lcd.print("      cm");
-  lcd.setCursor(0, 1);
-  lcd.print(distance);
+  //lcd.setCursor(0, 1);
+  //lcd.print("      cm");
+  //lcd.setCursor(0, 1);
+  //lcd.print(distance);
   Serial.print(distance);
   Serial.print("cm\r\n");
   delay(1000);
