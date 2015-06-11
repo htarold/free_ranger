@@ -83,17 +83,20 @@ int16_t range(uint8_t arduino_pin)
   ACSR = _BV(ACI)                     /* clear ACI */
        | _BV(ACIS0) | _BV(ACIS1);     /* Triggers on rising edge */
        
-#define ON_TIME 12
-#define OFF_TIME (24-ON_TIME)
+#define ON_TIME 15
+#define OFF_TIME (30-ON_TIME)
   OUTPUT_HIGH; _delay_us(ON_TIME);
   OUTPUT_LOW;  _delay_us(OFF_TIME);
   OUTPUT_HIGH; _delay_us(ON_TIME);
   OUTPUT_LOW;  _delay_us(OFF_TIME);
   /* Put the brakes on */
-  _delay_us(19);
+#if 1
+  _delay_us(17);
+  OUTPUT_HIGH; _delay_us(ON_TIME);
+  OUTPUT_LOW; _delay_us(OFF_TIME);
   OUTPUT_HIGH; _delay_us(ON_TIME);
   OUTPUT_LOW;
-
+#endif
   *ddr &= ~bm;
   ACSR |= _BV(ACI);
 
