@@ -182,7 +182,8 @@ int16_t range(uint8_t arduino_pin)
   c = 550 /* Rings for this long (in us) */
       / US_PER_CELL;
   for( ; c < NR_CELLS; c++){
-    int8_t d = cells[c] - cells[c-1];
+    int8_t d = cells[c] - cells[c-1]
+      + (c/8);      /* emphasise later cells */
     if (d > diff) {
       diff = d;
       echo = c;
