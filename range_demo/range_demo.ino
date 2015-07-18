@@ -1,20 +1,20 @@
 /*
   free_ranger demo code.  Code compiled and ran for nano V3.
-  
-  Code below outputs to a 8x2 text LCD as well as through the serial monitor.
-  The code will still function if you don't connect an LCD.
-  
-  Pins:
-  LCD RS: 12
-  LCD En: 11
-  LCD D4: 5
-  LCD D5: 4
-  LCD D6: 3
-  LCD D7: 2
-  LCD V0: 9 (display contrast voltage via PWM)
-  ranger comp- (signal): 7
-  ranger comp+ (dither): 6
-
+ 
+ Code below outputs to a 8x2 text LCD as well as through the serial monitor.
+ The code will still function if you don't connect an LCD.
+ 
+ Pins:
+ LCD RS: 12
+ LCD En: 11
+ LCD D4: 5
+ LCD D5: 4
+ LCD D6: 3
+ LCD D7: 2
+ LCD V0: 9 (display contrast voltage via PWM)
+ ranger comp- (signal): 7
+ ranger comp+ (dither): 6
+ 
  */
 
 #include <LiquidCrystal.h>
@@ -28,10 +28,10 @@
 uint8_t dither_duty;
 /*
   To use dithering, there must be a 10k/10n LPF between
-  pin 11/PB3/OC2A and pin 7/AIN1.
-  Call dither_calibrate() with the ranger quiescent to
-  calibrate the duty.
-  62.5kHz => 16us period.
+ pin 11/PB3/OC2A and pin 7/AIN1.
+ Call dither_calibrate() with the ranger quiescent to
+ calibrate the duty.
+ 62.5kHz => 16us period.
  */
 void dither_start(void)
 {
@@ -39,7 +39,7 @@ void dither_start(void)
   DDRB |= _BV(DDB3);                  /* = arduino pin d11 */
   OCR2A = dither_duty;
   TCCR2A = _BV(WGM21) | _BV(WGM20)    /* Fast PWM mode 3 */
-         | _BV(COM2A1);               /* output on Arduino 11 = PB3 = OC2A */
+    | _BV(COM2A1);               /* output on Arduino 11 = PB3 = OC2A */
   TCCR2B = _BV(CS20);                 /* /1 => 62.5kHz */
 }
 void dither_stop(void)
@@ -60,7 +60,7 @@ int8_t dither_calibrate(void)
 {
   uint8_t i;
   ACSR = _BV(ACI)
-       | _BV(ACIS1) | _BV(ACIS0);     /* Rising edge */
+    | _BV(ACIS1) | _BV(ACIS0);     /* Rising edge */
   /*
     Start comp+ voltage at signal q-point, around 2.0V
    */
@@ -68,13 +68,16 @@ int8_t dither_calibrate(void)
   dither_start();
   _delay_ms(500);                     /* stabilise */
   for(i = 0; comparator_triggered(); i++){
-    if (i > 250) { dither_stop(); return(-1); }
+    if (i > 250) { 
+      dither_stop(); 
+      return(-1); 
+    }
     dither_duty--;
     dither_start();
     _delay_us(10);                    /* stabilise */
   }
   dither_stop();
-  dither_duty -= dither_duty/8;       /* fudge a bit */
+  //dither_duty -= dither_duty/8;       /* fudge a bit */
   return(0);
 }
 
@@ -139,12 +142,12 @@ int16_t range(uint8_t arduino_pin)
   _delay_us(15);
   pulse(arduino_pin);
   pulse(arduino_pin);
-  
+
   /*
     Fill in histogram.
-    On regular Arduinos, timer 0 is configured to run at
-    4us/tick.  Each of our cells is US_PER_CELL long.  At
-    each tick, we sample the comparator.
+   On regular Arduinos, timer 0 is configured to run at
+   4us/tick.  Each of our cells is US_PER_CELL long.  At
+   each tick, we sample the comparator.
    */
 
 #define TICKS_PER_CELL 50
@@ -164,11 +167,11 @@ int16_t range(uint8_t arduino_pin)
 
   /*
     Find the echo.
-    If 1 cell is fully
-    detected, comparator will be triggered on half the
-    samples in that cell (TICKS_PER_CELL/2).
-
-    XXX
+   If 1 cell is fully
+   detected, comparator will be triggered on half the
+   samples in that cell (TICKS_PER_CELL/2).
+   
+   XXX
    */
 
   for(c = 0; c < NR_CELLS; c++){
@@ -178,27 +181,25 @@ int16_t range(uint8_t arduino_pin)
   Serial.print("\r\n");
 
   int8_t diff = 0;
-  uint8_t echo = 
-  c = 550 /* Rings for this long (in us) */
-      / US_PER_CELL;
-  for( ; c < NR_CELLS; c++){
+  uint8_t echo;
+  for(echo = c = NR_CELLS-1; c > 550 /* ringing */ / US_PER_CELL; c--){
     int8_t d = cells[c] - cells[c-1]
-      + (c/8);      /* emphasise later cells */
+    /* + (c/8)*/      ;      /* emphasise later cells */
     if (d > diff) {
       diff = d;
       echo = c;
     }
   }
-  
+
   if (0 == diff) return(-1);
-  
+
   /*
     Transmission offset is 4.5 cycles, or 4.5 * 30us = 135us,
-    or 0.15cm/us * 135us = 20cm constant.
+   or 0.15cm/us * 135us = 20cm constant.
    */
   return((20 +                        /* transmission offset */
-         echo * (US_PER_CELL * 0.15)) /* time of flight */
-         / 2);                        /* because it's reflected */
+  echo * (US_PER_CELL * 0.15)) /* time of flight */
+    / 2);                        /* because it's reflected */
 }
 
 void loop() {
@@ -214,4 +215,5 @@ void loop() {
   Serial.print("cm\r\n");
   delay(1000);
 }
+
 
