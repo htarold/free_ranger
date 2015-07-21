@@ -94,7 +94,7 @@ void setup(void)
     Serial.print("Calibrate error\r\n");
     for( ; ; );
   }
-  Serial.print("Dither duty = ");
+  Serial.print("\r\nDither duty = ");
   Serial.print(dither_duty);
   Serial.print("\r\n");
   dither_start();
@@ -150,16 +150,15 @@ int16_t range(uint8_t arduino_pin)
    each tick, we sample the comparator.
    */
 
-#define TICKS_PER_CELL 50
-#define US_PER_TICK 4
+#define TICKS_PER_CELL 128
+#define US_PER_TICK 1
 #define US_PER_CELL (TICKS_PER_CELL * US_PER_TICK)
 
   for(c = 0; c < NR_CELLS; c++){
     cells[c] = 0;
     for(uint8_t ticks = 0; ticks < TICKS_PER_CELL; ticks++){
-      for(uint8_t tcnt0 = TCNT0; tcnt0 == TCNT0; );
-      if ((ACSR & _BV(ACO)))
-        cells[c]++;
+      _delay_us(1);
+      cells[c] += ((ACSR & _BV(ACO)) >> ACO);
     }
   }
 
