@@ -1,19 +1,13 @@
 /*
   free_ranger demo code.  Code compiled and ran for nano V3.
  
- Code below outputs to a 8x2 text LCD as well as through the serial monitor.
- The code will still function if you don't connect an LCD.
- 
+  Arduino v1.6.4
  Pins:
- LCD RS: 12
- LCD En: 11
- LCD D4: 5
- LCD D5: 4
- LCD D6: 3
- LCD D7: 2
- LCD V0: 9 (display contrast voltage via PWM)
  ranger comp- (signal): 7
  ranger comp+ (dither): 6
+ Ranger TX pin: 8
+ Timer 2 dither output pin: 11
+   (connect a 6k8 from 11 to 6; and 10n from 11 to ground)
  
  */
 
@@ -28,7 +22,7 @@
 uint8_t dither_duty;
 /*
   To use dithering, there must be a 10k/10n LPF between
- pin 11/PB3/OC2A and pin 7/AIN1.
+ pin 11/PB3/OC2A and pin 6/AIN1.
  Call dither_calibrate() with the ranger quiescent to
  calibrate the duty.
  62.5kHz => 16us period.
@@ -83,12 +77,7 @@ int8_t dither_calibrate(void)
 
 void setup(void)
 {
-  //pinMode(9, OUTPUT);
-  //analogWrite(9, 50);  /* Contrast control.  Lower voltage = higher contrast */
-  //lcd.begin(8, 2);
-  //lcd.print("range:");
   Serial.begin(9600);
-  //dither_start((1.6/5.0)*256);
   _delay_ms(1000); /* Let everything settle */
   if (dither_calibrate()) {
     Serial.print("Calibrate error\r\n");
@@ -110,8 +99,8 @@ static inline void pulse(int txpin)
   _delay_us(11);
 }
 #define NR_CELLS 32
-uint8_t cells[NR_CELLS];
-int16_t range(uint8_t arduino_pin)
+
+void range_sounding(uint8_t arduino_pin, uint8_t cells[], int8_t nr_cells)
 {
   volatile uint8_t sreg;
   uint8_t c;
@@ -151,67 +140,84 @@ int16_t range(uint8_t arduino_pin)
    */
 
 #define TICKS_PER_CELL 128
-#define US_PER_TICK 1
+#define US_PER_TICK 0.75
 #define US_PER_CELL (TICKS_PER_CELL * US_PER_TICK)
 
-  for(c = 0; c < NR_CELLS; c++){
+  for(c = 0; c < nr_cells; c++){
     cells[c] = 0;
     for(uint8_t ticks = 0; ticks < TICKS_PER_CELL; ticks++){
-      _delay_us(1);
-      cells[c] += ((ACSR & _BV(ACO)) >> ACO);
+      uint8_t src, dst;
+      /*
+        This bit compiles differently depending on the compiler, so
+        it is spelled out explicitly so we can depend on the timing.
+        The code is basically:
+        cells[c] += ((ACSR & _BV(ACO)>>ACO;
+        The following assembles to:
+ 2a4:   90 b7           in      r25, 0x30       ; 48
+ 2a6:   95 fb           bst     r25, 5
+ 2a8:   20 f9           bld     r18, 0
+ 2aa:   90 81           ld      r25, Z
+ 2ac:   92 0f           add     r25, r18
+ 2ae:   90 83           st      Z, r25
+ 2b0:   8f 5f           subi    r24, 0xFF       ; 255
+ 2b2:   80 38           cpi     r24, 0x80       ; 128
+ 2b4:   b9 f7           brne    .-18            ; 0x2a4 <_Z5rangeh+0x58>
+       12 clocks = 0.75us
+       */
+      asm volatile("in %0, %2" "\n\t"
+                   "bst %0, %3" "\n\t"
+  	           "bld %1, %4" "\n\t" :
+  	           "=r"(src), "=r"(dst)  :
+  	           "I"(_SFR_IO_ADDR(ACSR)), "I"(5), "L"(0));
+      cells[c] += dst;
     }
   }
 
   SREG = sreg;
+}
+
+#define NR_CELLS 32
+uint8_t cells[2][NR_CELLS];
+
+void loop()
+{
+  static uint8_t current_row = 0;
+  uint8_t i;
+  
+  range_sounding(8, cells[current_row], NR_CELLS);
 
   /*
-    Find the echo.
-   If 1 cell is fully
-   detected, comparator will be triggered on half the
-   samples in that cell (TICKS_PER_CELL/2).
-   
-   XXX
+    De-noise: take the square-root of the product of two soundings.  This should
+    remove much of the surface reflections.  Then find the cell with the largest
+    positive increase in echo strength.
    */
 
-  for(c = 0; c < NR_CELLS; c++){
-    Serial.print(cells[c]);
-    Serial.print(" ");
+  int8_t max_diff = 0, cellno = -1;
+  uint8_t prev_val = 0;
+  
+  for(i = 0; i < NR_CELLS; i++){
+    uint16_t product = cells[0][i] * cells[1][i];
+    uint8_t val = (uint8_t)sqrt(product);
+    int8_t d = val - prev_val;
+    if (d > max_diff) {
+      max_diff = d;
+      cellno = i;
+    }
+    Serial.print(val);
+    Serial.print(' ');
   }
   Serial.print("\r\n");
 
-  int8_t diff = 0;
-  uint8_t echo;
-  for(echo = c = NR_CELLS-1; c > 550 /* ringing */ / US_PER_CELL; c--){
-    int8_t d = cells[c] - cells[c-1]
-    /* + (c/8)*/      ;      /* emphasise later cells */
-    if (d > diff) {
-      diff = d;
-      echo = c;
-    }
-  }
-
-  if (0 == diff) return(-1);
-
-  /*
-    Transmission offset is 4.5 cycles, or 4.5 * 30us = 135us,
-   or 0.15cm/us * 135us = 20cm constant.
-   */
-  return((20 +                        /* transmission offset */
-  echo * (US_PER_CELL * 0.15)) /* time of flight */
-    / 2);                        /* because it's reflected */
-}
-
-void loop() {
-  int16_t distance;
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
-  distance = range(8);
-  //lcd.setCursor(0, 1);
-  //lcd.print("      cm");
-  //lcd.setCursor(0, 1);
-  //lcd.print(distance);
-  Serial.print(distance);
-  Serial.print("cm\r\n");
+  if (cellno > -1)  {
+    Serial.print("Cell ");
+    Serial.print(cellno);
+    Serial.print(": ");
+    Serial.print((cellno * (US_PER_CELL*0.15))/2 + 20);
+  } else
+    Serial.print(-1);
+  Serial.print(" cm\r\n");
+  
+  current_row = (current_row?0:1);
   delay(1000);
 }
 
