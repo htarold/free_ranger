@@ -11,11 +11,6 @@
  
  */
 
-#include <LiquidCrystal.h>
-
-//LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-
-
 //#include <Arduino.h>
 #include <util/delay.h>
 
@@ -27,6 +22,7 @@ uint8_t dither_duty;
  calibrate the duty.
  62.5kHz => 16us period.
  */
+
 void dither_start(void)
 {
   if (!dither_duty) dither_duty = 82;
@@ -75,6 +71,11 @@ int8_t dither_calibrate(void)
   return(0);
 }
 
+#define NR_CELLS 40
+#define TICKS_PER_CELL 128
+#define US_PER_TICK 0.75
+#define US_PER_CELL (TICKS_PER_CELL * US_PER_TICK)
+
 void setup(void)
 {
   Serial.begin(9600);
@@ -83,11 +84,13 @@ void setup(void)
     Serial.print("Calibrate error\r\n");
     for( ; ; );
   }
-  Serial.print("\r\nDither duty = ");
+  Serial.print("\r\ndither_duty ");
   Serial.print(dither_duty);
-  Serial.print("\r\n");
   dither_start();
-  Serial.print("Starting\r\n");
+  Serial.print("\r\nnr_cells ");
+  Serial.println(NR_CELLS);
+  Serial.print("us_per_cell ");
+  Serial.println(US_PER_CELL);
   delay(100);
 }
 
@@ -98,7 +101,6 @@ static inline void pulse(int txpin)
   digitalWrite(txpin, LOW);
   _delay_us(11);
 }
-#define NR_CELLS 32
 
 void range_sounding(uint8_t arduino_pin, uint8_t cells[], int8_t nr_cells)
 {
@@ -139,9 +141,7 @@ void range_sounding(uint8_t arduino_pin, uint8_t cells[], int8_t nr_cells)
    each tick, we sample the comparator.
    */
 
-#define TICKS_PER_CELL 128
-#define US_PER_TICK 0.75
-#define US_PER_CELL (TICKS_PER_CELL * US_PER_TICK)
+
 
   for(c = 0; c < nr_cells; c++){
     cells[c] = 0;
@@ -176,7 +176,6 @@ void range_sounding(uint8_t arduino_pin, uint8_t cells[], int8_t nr_cells)
   SREG = sreg;
 }
 
-#define NR_CELLS 32
 uint8_t cells[2][NR_CELLS];
 
 void loop()
@@ -184,6 +183,7 @@ void loop()
   static uint8_t current_row = 0;
   uint8_t i;
   
+  current_row = (current_row?0:1);  
   range_sounding(8, cells[current_row], NR_CELLS);
 
   /*
@@ -192,33 +192,38 @@ void loop()
     positive increase in echo strength.
    */
 
-  int8_t max_diff = 0, cellno = -1;
-  uint8_t prev_val = 0;
-  
-  for(i = 0; i < NR_CELLS; i++){
-    uint16_t product = cells[0][i] * cells[1][i];
-    uint8_t val = (uint8_t)sqrt(product);
-    int8_t d = val - prev_val;
-    if (d > max_diff) {
-      max_diff = d;
+  int16_t max_diff = 0;
+  uint8_t cellno = NR_CELLS-1;
+  int16_t w[3] = {127,127,127};
+
+  for(i = 0; i < NR_CELLS; i++) {
+    Serial.print(cells[current_row][i]);
+    Serial.print(' ');
+    w[0] = w[1]; w[1] = w[2];
+    if (i < NR_CELLS-1)
+      w[2] = sqrt(cells[0][i+1] * cells[1][i+1]);
+    else
+      w[2] = 0;
+    //Serial.print(w[0]); Serial.print(' ');
+    //Serial.print(w[1]); Serial.print(' ');
+    //Serial.println(w[2]);
+    int16_t d = (w[2] + w[1])/2 - w[0];
+    if (d+(i/8) > max_diff) {
+      max_diff = d+(i/8);
       cellno = i;
     }
-    Serial.print(val);
-    Serial.print(' ');
   }
-  Serial.print("\r\n");
 
-  if (cellno > -1)  {
-    Serial.print("Cell ");
-    Serial.print(cellno);
-    Serial.print(": ");
-    Serial.print((cellno * (US_PER_CELL*0.15))/2 + 20);
-  } else
-    Serial.print(-1);
-  Serial.print(" cm\r\n");
+  //Serial.print(w[0]); Serial.print(' ');
+  //Serial.print(w[1]); Serial.print(' ');
+  //Serial.println(w[2]);
   
-  current_row = (current_row?0:1);
+  Serial.print("\r\nCell ");
+  Serial.print(cellno);
+  Serial.print("\r\ndistance ");
+  Serial.print((cellno * (US_PER_CELL*0.15))/2 + 20);
+  Serial.print(" cm\r\n");
+  //Serial.println(max_diff);
+
   delay(1000);
 }
-
-
